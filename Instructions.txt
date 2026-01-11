@@ -5,9 +5,9 @@ python -m sounddevice
 da našteješ vse mikrofone in zvočnike. V sledeči komandi uporabi ID naprave 
 (št. pred imenom naprave) ki jo želiš uporabiti za zajem in predvajanje.
 
-python noise_suppressor.py -m model/noise-suppression-denseunet-ll-0001.xml -i 1 -o 3
+python noise_suppressor.py -m intel/noise-suppression-denseunet-ll-0001/FP16/noise-suppression-denseunet-ll-0001.xml -i 1 -o 3
 
 
 Naslednja komanda omogoča input datoteko in output datoteko
 
-python noise_suppressor.py -m model/noise-suppression-denseunet-ll-0001.xml -if input.wav -of output.wav
+python noise_suppressor.py -m intel/noise-suppression-denseunet-ll-0001/FP16/noise-suppression-denseunet-ll-0001.xml -if input.wav -of output.wav
