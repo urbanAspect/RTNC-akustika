@@ -3,6 +3,10 @@ import argparse
 import time
 import numpy as np
 import sounddevice as sd
+try:
+    import soundfile as sf
+except ImportError:
+    sf = None
 from openvino.runtime import Core
 
 class OpenVINONoiseSuppressor:
@@ -88,6 +92,8 @@ def main():
     parser.add_argument("-d", "--device", default="CPU", help="Device to run inference on (CPU, GPU, AUTO)")
     parser.add_argument("-i", "--input", type=int, default=None, help="Input device ID (Microphone)")
     parser.add_argument("-o", "--output", type=int, default=None, help="Output device ID (Speakers/Virtual Cable)")
+    parser.add_argument("-if", "--input_file", help="Path to input audio file (.wav) - requires 'soundfile' lib")
+    parser.add_argument("-of", "--output_file", help="Path to output audio file (.wav)")
     
     args = parser.parse_args()
 
@@ -114,6 +120,51 @@ def main():
         BLOCK_SIZE = get_dim(input_shape[1])
     else:
         BLOCK_SIZE = 1024 # Fallback
+
+    # --- File Processing Mode ---
+    if args.input_file:
+        if sf is None:
+            print("Error: 'soundfile' library is required for file processing. Please install it: pip install soundfile")
+            sys.exit(1)
+        if not args.output_file:
+            print("Error: Output file path (-of) is required when using input file.")
+            sys.exit(1)
+
+        print(f"Processing file: {args.input_file}")
+        data, samplerate = sf.read(args.input_file)
+
+        # Ensure mono and float32
+        if len(data.shape) > 1:
+            data = data[:, 0]
+        data = data.astype(np.float32)
+
+        if samplerate != SAMPLE_RATE:
+            print(f"Resampling input from {samplerate}Hz to {SAMPLE_RATE}Hz...")
+            try:
+                import scipy.signal
+                import math
+                gcd = math.gcd(samplerate, SAMPLE_RATE)
+                data = scipy.signal.resample_poly(data, SAMPLE_RATE // gcd, samplerate // gcd)
+            except ImportError:
+                print("Error: 'scipy' library is required for resampling. Please install it: pip install scipy")
+                sys.exit(1)
+
+        original_len = len(data)
+        # Pad data to match block size
+        pad_len = BLOCK_SIZE - (original_len % BLOCK_SIZE)
+        if pad_len != BLOCK_SIZE:
+            data = np.pad(data, (0, pad_len))
+
+        output_audio = []
+        print("Running inference...")
+        for i in range(0, len(data), BLOCK_SIZE):
+            chunk = data[i:i+BLOCK_SIZE]
+            output_audio.append(suppressor.process_chunk(chunk))
+
+        final_audio = np.concatenate(output_audio)[:original_len]
+        sf.write(args.output_file, final_audio, SAMPLE_RATE)
+        print(f"Saved processed audio to: {args.output_file}")
+        sys.exit(0)
 
     print(f"\nStarting Stream: {SAMPLE_RATE}Hz, Block Size: {BLOCK_SIZE}")
     print("Press Ctrl+C to stop...")
