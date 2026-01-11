@@ -1,0 +1,8 @@
+Zaženi
+
+python -m sounddevice
+
+da našteješ vse mikrofone in zvočnike. Uporabi ID (št. pred imenom naprave)
+v sledeči komandi
+
+python noise_suppressor.py -m model/noise-suppression-denseunet-ll-0001.xml -i 1 -o 3
