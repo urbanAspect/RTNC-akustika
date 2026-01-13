@@ -131,6 +131,7 @@ def main():
             sys.exit(1)
 
         print(f"Processing file: {args.input_file}")
+        total_start_time = time.time()
         data, samplerate = sf.read(args.input_file)
 
         # Ensure mono and float32
@@ -138,8 +139,10 @@ def main():
             data = data[:, 0]
         data = data.astype(np.float32)
 
+        resample_duration = 0.0
         if samplerate != SAMPLE_RATE:
             print(f"Resampling input from {samplerate}Hz to {SAMPLE_RATE}Hz...")
+            resample_start = time.time()
             try:
                 import scipy.signal
                 import math
@@ -148,6 +151,8 @@ def main():
             except ImportError:
                 print("Error: 'scipy' library is required for resampling. Please install it: pip install scipy")
                 sys.exit(1)
+            resample_duration = time.time() - resample_start
+            print(f"Resampling done. Time: {resample_duration:.4f}s")
 
         original_len = len(data)
         # Pad data to match block size
@@ -157,13 +162,28 @@ def main():
 
         output_audio = []
         print("Running inference...")
+        inference_start = time.time()
         for i in range(0, len(data), BLOCK_SIZE):
             chunk = data[i:i+BLOCK_SIZE]
             output_audio.append(suppressor.process_chunk(chunk))
+        inference_duration = time.time() - inference_start
+        print(f"Inference done. Time: {inference_duration:.4f}s")
 
         final_audio = np.concatenate(output_audio)[:original_len]
         sf.write(args.output_file, final_audio, SAMPLE_RATE)
         print(f"Saved processed audio to: {args.output_file}")
+
+        total_duration = time.time() - total_start_time
+        other_time =  total_duration - resample_duration - inference_duration
+        print("\n" + "="*35)
+        print(f"{'TIMING SUMMARY':^35}")
+        print("="*35)
+        print(f"{'Resampling Time':<20} : {resample_duration:>10.4f}s")
+        print(f"{'Inference Time':<20} : {inference_duration:>10.4f}s")
+        print(f"{'Other Time':<20} : {other_time:>10.4f}s")
+        print("-" * 35)
+        print(f"{'Total Time':<20} : {total_duration:>10.4f}s")
+        print("="*35)
         sys.exit(0)
 
     print(f"\nStarting Stream: {SAMPLE_RATE}Hz, Block Size: {BLOCK_SIZE}")
