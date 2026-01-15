@@ -3,6 +3,7 @@ import argparse
 import time
 import numpy as np
 import sounddevice as sd
+import queue
 try:
     import soundfile as sf
 except ImportError:
@@ -126,9 +127,6 @@ def main():
         if sf is None:
             print("Error: 'soundfile' library is required for file processing. Please install it: pip install soundfile")
             sys.exit(1)
-        if not args.output_file:
-            print("Error: Output file path (-of) is required when using input file.")
-            sys.exit(1)
 
         print(f"Processing file: {args.input_file}")
         total_start_time = time.time()
@@ -160,32 +158,94 @@ def main():
         if pad_len != BLOCK_SIZE:
             data = np.pad(data, (0, pad_len))
 
-        output_audio = []
-        print("Running inference...")
-        inference_start = time.time()
-        for i in range(0, len(data), BLOCK_SIZE):
-            chunk = data[i:i+BLOCK_SIZE]
-            output_audio.append(suppressor.process_chunk(chunk))
-        inference_duration = time.time() - inference_start
-        print(f"Inference done. Time: {inference_duration:.4f}s")
+        if args.output_file:
+            # --- File Input -> File Output ---
+            output_audio = []
+            print("Running inference...")
+            inference_start = time.time()
+            for i in range(0, len(data), BLOCK_SIZE):
+                chunk = data[i:i+BLOCK_SIZE]
+                output_audio.append(suppressor.process_chunk(chunk))
+            inference_duration = time.time() - inference_start
+            print(f"Inference done. Time: {inference_duration:.4f}s")
 
-        final_audio = np.concatenate(output_audio)[:original_len]
-        sf.write(args.output_file, final_audio, SAMPLE_RATE)
-        print(f"Saved processed audio to: {args.output_file}")
+            final_audio = np.concatenate(output_audio)[:original_len]
+            sf.write(args.output_file, final_audio, SAMPLE_RATE)
+            print(f"Saved processed audio to: {args.output_file}")
 
-        total_duration = time.time() - total_start_time
-        other_time =  total_duration - resample_duration - inference_duration
-        print("\n" + "="*35)
-        print(f"{'TIMING SUMMARY':^35}")
-        print("="*35)
-        print(f"{'Resampling Time':<20} : {resample_duration:>10.4f}s")
-        print(f"{'Inference Time':<20} : {inference_duration:>10.4f}s")
-        print(f"{'Other Time':<20} : {other_time:>10.4f}s")
-        print("-" * 35)
-        print(f"{'Total Time':<20} : {total_duration:>10.4f}s")
-        print("="*35)
+            total_duration = time.time() - total_start_time
+            other_time =  total_duration - resample_duration - inference_duration
+            print("\n" + "="*35)
+            print(f"{'TIMING SUMMARY':^35}")
+            print("="*35)
+            print(f"{'Resampling Time':<20} : {resample_duration:>10.4f}s")
+            print(f"{'Inference Time':<20} : {inference_duration:>10.4f}s")
+            print(f"{'Other Time':<20} : {other_time:>10.4f}s")
+            print("-" * 35)
+            print(f"{'Total Time':<20} : {total_duration:>10.4f}s")
+            print("="*35)
+        else:
+            # --- File Input -> Speaker Output ---
+            print(f"Playing processed audio to device {args.output if args.output else 'Default'}...")
+            
+            playback_idx = 0
+            def playback_callback(outdata, frames, time, status):
+                nonlocal playback_idx
+                if status:
+                    print(status, file=sys.stderr)
+                
+                if playback_idx >= len(data):
+                    raise sd.CallbackStop()
+                
+                chunk = data[playback_idx : playback_idx + frames]
+                if len(chunk) < frames:
+                    chunk = np.pad(chunk, (0, frames - len(chunk)))
+                
+                processed = suppressor.process_chunk(chunk)
+                outdata[:] = processed[:, np.newaxis]
+                playback_idx += frames
+
+            try:
+                with sd.OutputStream(device=args.output, samplerate=SAMPLE_RATE,
+                                     blocksize=BLOCK_SIZE, channels=1, dtype=np.float32,
+                                     callback=playback_callback):
+                    while playback_idx < len(data):
+                        sd.sleep(100)
+            except KeyboardInterrupt:
+                print("\nPlayback stopped.")
+            print("Done.")
+            
         sys.exit(0)
 
+    # --- Microphone Input -> File Output ---
+    if args.output_file:
+        if sf is None:
+            print("Error: 'soundfile' library is required for file recording.")
+            sys.exit(1)
+        
+        print(f"Recording from device {args.input if args.input else 'Default'} to {args.output_file}")
+        print("Press Ctrl+C to stop...")
+        
+        audio_queue = queue.Queue()
+        def record_callback(indata, frames, time, status):
+            if status:
+                print(status, file=sys.stderr)
+            audio_queue.put(indata.copy())
+
+        try:
+            with sf.SoundFile(args.output_file, mode='w', samplerate=SAMPLE_RATE, channels=1) as file:
+                with sd.InputStream(device=args.input, samplerate=SAMPLE_RATE,
+                                    blocksize=BLOCK_SIZE, channels=1, dtype=np.float32,
+                                    callback=record_callback):
+                    while True:
+                        indata = audio_queue.get()
+                        processed = suppressor.process_chunk(indata[:, 0])
+                        file.write(processed)
+        except KeyboardInterrupt:
+            print(f"\nRecording stopped. Saved to {args.output_file}")
+        sys.exit(0)
+
+    # --- Microphone Input -> Speaker Output (Stream) ---
     print(f"\nStarting Stream: {SAMPLE_RATE}Hz, Block Size: {BLOCK_SIZE}")
     print("Press Ctrl+C to stop...")
 
@@ -228,6 +288,10 @@ def main():
         print("\nStopping...")
     except Exception as e:
         print(f"\nAn error occurred: {e}")
+        if "Invalid sample rate" in str(e):
+            print("\n[Tip] The device refused the 16000Hz sample rate.")
+            print("      Try using an 'MME' device ID (usually 0-9) instead of WASAPI.")
+            print("      MME drivers handle resampling automatically.")
 
 if __name__ == "__main__":
     main()
