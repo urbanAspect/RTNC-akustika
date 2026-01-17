@@ -7,7 +7,7 @@ import threading
 class AudioCombinerApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("Audio Combiner - Matrix Suite V9")
+        self.root.title("Audio Combiner")
         self.root.geometry("460x320")
         self.root.resizable(False, False)
 
@@ -25,7 +25,7 @@ class AudioCombinerApp:
         self.vol2_val = tk.StringVar(value="100")
         self.loop_shorter = tk.BooleanVar(value=False)
         self.crop_to_in2 = tk.BooleanVar(value=False)
-        self.matrix_mode = tk.BooleanVar(value=False)
+        # Matrix mode is now always enabled; remove variable
 
         self.main_frame = ttk.Frame(root, padding="20 10 20 20")
         self.main_frame.pack(fill=tk.BOTH, expand=True)
@@ -36,8 +36,7 @@ class AudioCombinerApp:
         for widget in self.main_frame.winfo_children():
             widget.destroy()
 
-        mode_text = "MATRIX MODE" if self.matrix_mode.get() else "SINGLE OVERLAY MODE"
-        ttk.Label(self.main_frame, text=mode_text, font=("Segoe UI", 10, "bold"), foreground="black").grid(row=0, column=0, columnspan=2, sticky="w", pady=(0,10))
+        ttk.Label(self.main_frame, text="Audio Combiner", font=("Segoe UI", 10, "bold"), foreground="black").grid(row=0, column=0, columnspan=2, sticky="w", pady=(0,10))
         ttk.Button(self.main_frame, text="Help", command=self.show_help).grid(row=0, column=2, sticky="e")
 
         # Input 1
@@ -71,18 +70,12 @@ class AudioCombinerApp:
         self.combine_btn = ttk.Button(btn_frame, text="START PROCESSING", command=self.start_processing)
         self.combine_btn.pack(side=tk.LEFT, expand=True, fill=tk.X, padx=(0, 5))
         
-        mode_btn_txt = "To Single/Batch" if self.matrix_mode.get() else "To Matrix Mode"
-        ttk.Button(btn_frame, text=mode_btn_txt, command=self.toggle_mode).pack(side=tk.RIGHT)
+        # Removed mode toggle button
 
         self.status_label = ttk.Label(self.main_frame, text="Ready", foreground="gray")
         self.status_label.grid(row=9, column=0, columnspan=3)
 
-    def toggle_mode(self):
-        self.matrix_mode.set(not self.matrix_mode.get())
-        self.input1_files, self.input2_files = [], []
-        self.input1_display.set("No files selected")
-        self.input2_display.set("No files selected")
-        self.build_ui()
+    # Removed toggle_mode method
 
     def browse_in1(self):
         f = filedialog.askopenfilenames(filetypes=[("Media", "*.mp3 *.wav *.aac *.mp4 *.mkv *.avi *.mov *.flac")])
@@ -102,7 +95,7 @@ class AudioCombinerApp:
         help_text = (
             "User Instructions\n\n"
             "1. SELECT INPUTS:\n"
-            "   In Matrix Mode, select multiple files for both inputs.\n   In Single Overlay Mode, select multiple files for the first input\n   and one file for the second input.\n\n"
+            "   Select multiple files for both Input 1 and Input 2.\n\n"
             "2. ADJUST VOLUME:\n"
             "   100 = Original volume\n   0 = Muted\n   200 = Double\n\n"
             "3. LOOPING OPTION:\n"
