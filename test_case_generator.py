@@ -139,8 +139,14 @@ class AudioCombinerApp:
 
                 # Robust Filtering: resample to 44.1kHz and mix
                 # duration=shortest is used if Crop to In2 is checked
-                dur = "shortest" if self.crop_to_in2.get() else "longest"
-                
+                # duration=first is used if looping is enabled (to match Input 1)
+                if self.crop_to_in2.get():
+                    dur = "shortest"
+                elif self.loop_shorter.get():
+                    dur = "first"
+                else:
+                    dur = "longest"
+
                 filter_complex = (
                     f"[0:a]aresample=44100,volume={v1}[a1]; "
                     f"[1:a]aresample=44100,volume={v2}[a2]; "
@@ -148,7 +154,7 @@ class AudioCombinerApp:
                 )
 
                 cmd = ["ffmpeg"] + args + ["-filter_complex", filter_complex, "-ac", "2", "-y", out_name]
-                
+
                 sinfo = subprocess.STARTUPINFO()
                 sinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
                 subprocess.run(cmd, capture_output=True, startupinfo=sinfo)
