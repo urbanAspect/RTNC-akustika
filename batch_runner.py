@@ -7,7 +7,7 @@ from tkinter import filedialog, messagebox
 from concurrent.futures import ProcessPoolExecutor, as_completed
 import psutil
 
-# --- STANDALONE WORKER FUNCTION ---
+# Izvajajanje posamezne datoteke
 def run_single_file(file_path, script, model, out_dir, idx):
     fname = os.path.basename(file_path)
     temp_in = os.path.join(out_dir, f"proc_{idx}_in.wav")
@@ -36,7 +36,7 @@ def run_single_file(file_path, script, model, out_dir, idx):
         if os.path.exists(temp_in): os.remove(temp_in)
         if os.path.exists(temp_out): os.remove(temp_out)
 
-# --- GUI CLASS ---
+# Grafični vmesnik
 ctk.set_appearance_mode("Dark")
 ctk.set_default_color_theme("blue")
 
@@ -54,7 +54,7 @@ class NoiseSuppressorGUI(ctk.CTk):
         self.output_dir = os.path.join(self.script_dir, "denoised_output")
         self.selected_files = []
 
-        # --- UI Setup ---
+        # UI Setup
         self.grid_columnconfigure(0, weight=1)
         ctk.CTkLabel(self, text="Batch denoiser", font=("Segoe UI", 24, "bold")).grid(row=0, column=0, pady=20)
 
@@ -96,7 +96,7 @@ class NoiseSuppressorGUI(ctk.CTk):
         ctk.CTkButton(self.config_frame, text="Browse", width=80, command=browse_command).grid(row=row, column=2, padx=10, pady=5)
         return e
 
-    # --- BROWSE HANDLERS ---
+    # Brskanje datotek in map
     def browse_script(self):
         path = filedialog.askopenfilename(filetypes=[("Python Files", "*.py")])
         if path:

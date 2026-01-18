@@ -5,15 +5,15 @@ from tkinter import ttk, filedialog, messagebox
 import numpy as np
 import librosa
 
-
+# Izračun SNR
 def estimate_snr_db(path: str) -> float:
-    # Preserve native sample rate (sr=None) and convert to mono for a single SNR value per file
+    # Ohrani izvorno vzorčno frekvenco in pretvori v mono za eno vrednost SNR na datoteko
     y, sr = librosa.load(path, sr=None, mono=True)
 
     if y is None or len(y) == 0:
         raise ValueError("Empty or unreadable audio.")
 
-    # Frame-level RMS to estimate 'signal' vs 'noise floor'
+    # RMS za oceno 'signala' proti 'šumu'
     frame_length = 2048
     hop_length = 512
     rms = librosa.feature.rms(y=y, frame_length=frame_length, hop_length=hop_length)[0]
@@ -21,9 +21,9 @@ def estimate_snr_db(path: str) -> float:
     if rms.size == 0:
         raise ValueError("Could not compute RMS.")
 
-    # Robust heuristic:
-    # - signal level ~ 90th percentile RMS
-    # - noise level  ~ 10th percentile RMS
+    # Hevristika za SNR:
+    # raven signala ~ 90th percentile RMS
+    # raven šuma    ~ 10th percentile RMS
     signal = float(np.percentile(rms, 90))
     noise = float(np.percentile(rms, 10))
 
@@ -31,7 +31,7 @@ def estimate_snr_db(path: str) -> float:
     snr_db = 20.0 * np.log10((signal + eps) / (noise + eps))
     return snr_db
 
-
+# Grafični vmesnik
 class SNRGui(tk.Tk):
     def __init__(self):
         super().__init__()

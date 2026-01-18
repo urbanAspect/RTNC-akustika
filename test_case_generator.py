@@ -14,7 +14,7 @@ class AudioCombinerApp:
         style = ttk.Style()
         style.theme_use('vista')
 
-        # --- Variables ---
+        # Spremenljivke
         self.input1_files = []
         self.input2_files = []
         self.input1_display = tk.StringVar(value="No files selected")
@@ -25,7 +25,6 @@ class AudioCombinerApp:
         self.vol2_val = tk.StringVar(value="100")
         self.loop_shorter = tk.BooleanVar(value=False)
         self.crop_to_in2 = tk.BooleanVar(value=False)
-        # Matrix mode is now always enabled; remove variable
 
         self.main_frame = ttk.Frame(root, padding="20 10 20 20")
         self.main_frame.pack(fill=tk.BOTH, expand=True)
@@ -69,13 +68,9 @@ class AudioCombinerApp:
         btn_frame.grid(row=8, column=0, columnspan=3, sticky="ew", pady=10)
         self.combine_btn = ttk.Button(btn_frame, text="START PROCESSING", command=self.start_processing)
         self.combine_btn.pack(side=tk.LEFT, expand=True, fill=tk.X, padx=(0, 5))
-        
-        # Removed mode toggle button
 
         self.status_label = ttk.Label(self.main_frame, text="Ready", foreground="gray")
         self.status_label.grid(row=9, column=0, columnspan=3)
-
-    # Removed toggle_mode method
 
     def browse_in1(self):
         f = filedialog.askopenfilenames(filetypes=[("Media", "*.mp3 *.wav *.aac *.mp4 *.mkv *.avi *.mov *.flac")])
@@ -113,6 +108,7 @@ class AudioCombinerApp:
         self.combine_btn.config(state=tk.DISABLED)
         threading.Thread(target=self.process_logic).start()
 
+    # Združevalna logika
     def process_logic(self):
         out_dir = self.output_folder.get()
         v1, v2 = int(self.vol1_val.get())/100.0, int(self.vol2_val.get())/100.0
@@ -125,14 +121,11 @@ class AudioCombinerApp:
                 out_name = os.path.join(out_dir, f"{os.path.splitext(os.path.basename(f1))[0]}_X_{os.path.splitext(os.path.basename(f2))[0]}.mp3")
                 self.root.after(0, lambda c=current: self.status_label.config(text=f"Task {c}/{total}..."))
 
-                # Core FFMPEG Command
                 args = ["-i", f1]
                 if self.loop_shorter.get(): args += ["-stream_loop", "-1"]
                 args += ["-i", f2]
 
-                # Robust Filtering: resample to 44.1kHz and mix
-                # duration=shortest is used if Crop to In2 is checked
-                # duration=first is used if looping is enabled (to match Input 1)
+                # Nastavitve trajanja
                 if self.crop_to_in2.get():
                     dur = "shortest"
                 elif self.loop_shorter.get():
@@ -140,12 +133,14 @@ class AudioCombinerApp:
                 else:
                     dur = "longest"
 
+                # Filter kompleks
                 filter_complex = (
                     f"[0:a]aresample=44100,volume={v1}[a1]; "
                     f"[1:a]aresample=44100,volume={v2}[a2]; "
                     f"[a1][a2]amix=inputs=2:duration={dur}:dropout_transition=0"
                 )
 
+                # Združevanje s ffmpeg
                 cmd = ["ffmpeg"] + args + ["-filter_complex", filter_complex, "-ac", "2", "-y", out_name]
 
                 sinfo = subprocess.STARTUPINFO()
